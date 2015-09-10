@@ -10,24 +10,24 @@ D = eye(2);
 
 G = [-1.75,1;
     1.2,2];
-h = [1.5;1.3];
+h = [-0.6;0.8];
 
-sigma = 1/25;
+sigma = 1/8;
 
-wMin = -50*sigma;
+wMin = -2*sigma;
 wMax = -wMin;
-W = [diag([1/wMax,1/wMax]);diag([1/wMin,1/wMin])];
+W = sparse([diag([1/wMax,1/wMax]);diag([1/wMin,1/wMin])]);
 
-p = .8;
+p = .5;
 
-if 1
+if 0
     
     SigmaI = eye(2)/sigma;
     
     offset = (1+cdf(SigmaI,[1,1]*wMax,[1,1]*wMin,0,[],0))/((wMax-wMin)^2);
     
     
-    ll = wMin;
+    ll = .2*wMax;
     ul = wMax;
     
     x1 = linspace(ll,ul,n);
@@ -83,24 +83,43 @@ if 1
 
     M = value(X);
 
-    [Lambda,lambda] = inequalityReduction(-V*M*A,v-V*M*h);
+    [~,K,~,gamma2,~] = terminalController(A,B,D,eye(2),1,500);
 
-    [~,K,~,gamma2,~] = terminalController(A,B,D,eye(2),1,300);
+    [Lambda,lambda] = inequalityReduction(-V*M*(A+B*K),v-V*M*h);
 
-
-    Xk = Polyhedron(Lambda,lambda);
-    Sk = Polyhedron();
-    Ws = Polyhedron(W,ones(4,1));
-
+%     Xk = Polyhedron(Lambda,lambda);
+%     Sk = Polyhedron();
+%     Ws = Polyhedron(W,ones(4,1));
+% 
     iter = 1;
-    iterMax = 50;
+    iterMax = 5000;
+% 
+    PSI = (A+B*K);
+%     
+%     while and(~(Xk<=Sk),iter<iterMax)
+%         if iter~=1
+%             Xk = Sk.minHRep;
+%         end
+%         Sk = PSI*Xk - D*Ws;
+%         iter = iter + 1;
+%     end
 
-    while and(~(Xk<=Sk),iter<iterMax)
-        if iter~=1
-            Xk = Sk.minHRep;
+    II = [Lambda,zeros(size(lambda));
+          zeros(1,2),-1];
+	ii = [lambda;1];
+    
+    JJ = [];
+    jj = [];
+    
+    while and(~isContained(II,ii,JJ,jj),iter<=iterMax)
+        iter = iter+1;
+        JJ = zeros(size(II));
+        jj = zeros(size(ii));
+        for i = 1:length(jj);
+            res = gurobi(struct('A',W,'rhs',ones(4,1),'sense','<','obj',II(i,1:2)*D,'modelsense','max'));
+            JJ(i,:) = [II(i,1:2)*PSI,res.objval];
+            jj(i) = ii(i) - res.objval;
         end
-        Sk = (A+B*K)*Xk - D*Ws;
-        iter = iter + 1;
+        [JJ,jj] = inequalityReduction([II;JJ],[ii;jj]);
     end
 end
-
