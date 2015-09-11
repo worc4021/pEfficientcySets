@@ -112,14 +112,22 @@ if 1
     jj = [];
     
     while and(~isContained(II,ii,JJ,jj),iter<=iterMax)
+        if iter ~= 1
+            II = JJ;
+            ii = jj;
+        end
         iter = iter+1;
         JJ = zeros(size(II));
         jj = zeros(size(ii));
         for i = 1:length(jj);
-            res = gurobi(struct('A',W,'rhs',ones(4,1),'sense','<','obj',II(i,1:2)*D,'modelsense','max'));
-            JJ(i,:) = [II(i,1:2)*PSI,res.objval];
+            res = gurobi(struct('A',W,'rhs',ones(4,1),'sense','<',...
+                'obj',II(i,1:2)*D,'modelsense','max'));
+            JJ(i,:) = [II(i,1:2)*PSI,II(i,3)+res.objval];
             jj(i) = ii(i) - res.objval;
         end
-        [JJ,jj] = inequalityReduction([II;JJ],[ii;jj]);
+%         [JJ,jj] = inequalityReduction([II;JJ],[ii;jj]);
+        pp = minHRep(Polyhedron([II;JJ],[ii;jj]));
+        JJ = pp.A;
+        jj = pp.b;
     end
 end
